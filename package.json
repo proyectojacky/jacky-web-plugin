@@ -1,6 +1,6 @@
 {
   "name": "@proyectojacky/jacky",
-  "version": "0.1.0",
+  "version": "0.1.1",
   "description": "Jacky web pet plugin: framework-agnostic sprite engine + React wrapper with .jacky skin support (Workshop, URL, folder, drag & drop).",
   "keywords": [
     "jacky",

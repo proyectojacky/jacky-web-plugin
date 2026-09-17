@@ -5,6 +5,7 @@
 import { describe, expect, it } from "vitest";
 import JSZip from "jszip";
 import { loadSkinFromSource, SkinLoadError } from "../src/skin/skinLoader";
+import { isWorkshopRef, splitWorkshopRef } from "../src/skin/workshopApi";
 
 async function makeJacky(files: Record<string, string | Uint8Array>) {
   const zip = new JSZip();
@@ -86,12 +87,39 @@ describe("loadSkinFromSource (zip)", () => {
 });
 
 describe("workshop ref detection", () => {
-  it("treats bare author/slug strings as workshop refs", async () => {
-    await expect(
-      loadSkinFromSource("proyecto_jacky/samplecharacter3", { sourceKind: "site" }),
-    ).rejects.toMatchObject({
-      // Network resolve fails in the test env — proves the workshop path ran.
-      message: expect.stringContaining("proyecto_jacky/samplecharacter3"),
+  it("accepts author/slug with hyphens and underscores", () => {
+    expect(isWorkshopRef("author/slug")).toBe(true);
+    expect(isWorkshopRef("proyecto_jacky/samplecharacter3")).toBe(true);
+    expect(isWorkshopRef("my-author/my-skin")).toBe(true);
+    expect(isWorkshopRef("Proyecto_Jacky/SampleCharacter3")).toBe(true);
+  });
+
+  it("rejects paths, URLs, and non-refs", () => {
+    expect(isWorkshopRef("/sprites/Jacky")).toBe(false);
+    expect(isWorkshopRef("https://cdn.example.com/a.jacky")).toBe(false);
+    expect(isWorkshopRef("a/b/c")).toBe(false);
+    expect(isWorkshopRef("solo")).toBe(false);
+  });
+
+  it("normalizes refs to lowercase", () => {
+    expect(splitWorkshopRef("Proyecto_Jacky/SampleCharacter3")).toEqual({
+      author: "proyecto_jacky",
+      id: "samplecharacter3",
     });
+  });
+
+  it("routes underscore refs through the workshop loader (not folder)", async () => {
+    const error = await loadSkinFromSource(
+      "proyecto_jacky/samplecharacter3",
+      { sourceKind: "site" },
+    ).catch((err) => err);
+
+    // Must not fall through to folder mode (character.json 404).
+    expect(error).toBeInstanceOf(SkinLoadError);
+    expect((error as SkinLoadError).code).not.toBe("missing_character_json");
+    expect((error as SkinLoadError).message).not.toMatch(/Folder skin/);
+    // In Node, Image decode yields 0 frames → missing_idle after workshop download.
+    expect((error as SkinLoadError).code).toBe("missing_idle");
+    expect((error as SkinLoadError).message).toContain("SampleCharacter3");
   });
 });

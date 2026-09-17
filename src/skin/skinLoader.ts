@@ -108,7 +108,12 @@ function normalizeSource(source: SkinSourceConfig): NormalizedSource {
   if (typeof source === "string") {
     const trimmed = source.trim();
     if (isWorkshopRef(trimmed)) {
-      return { kind: "workshop", ref: trimmed, version: "latest" };
+      const parts = splitWorkshopRef(trimmed)!;
+      return {
+        kind: "workshop",
+        ref: `${parts.author}/${parts.id}`,
+        version: "latest",
+      };
     }
     if (/^https?:\/\//i.test(trimmed) || /\.jacky$/i.test(trimmed)) {
       return { kind: "zip-url", url: trimmed };
@@ -119,9 +124,16 @@ function normalizeSource(source: SkinSourceConfig): NormalizedSource {
   }
 
   if ("workshop" in source) {
+    const parts = splitWorkshopRef(source.workshop);
+    if (!parts) {
+      throw new SkinLoadError(
+        `Invalid workshop ref "${source.workshop}"`,
+        "network",
+      );
+    }
     return {
       kind: "workshop",
-      ref: source.workshop,
+      ref: `${parts.author}/${parts.id}`,
       version: source.version ?? "latest",
     };
   }

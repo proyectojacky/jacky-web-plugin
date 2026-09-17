@@ -1,9 +1,13 @@
 // Workshop resolution: `author/slug` -> public item metadata + stable
-// download URL. Mirrors the endpoints used by jacky-frontend
-// (src/lib/workshop/client.ts) but is standalone (no cookies / CSRF needed
-// for public metadata + downloads).
+// download URL. Standalone (no cookies / CSRF needed for public metadata + downloads).
 
 export const DEFAULT_WORKSHOP_API = "https://api.jacky.club";
+
+/**
+ * Default site skin for embeds that omit `skin`.
+ * Workshop ref so third-party sites work without hosting sprite folders.
+ */
+export const DEFAULT_SITE_SKIN = "proyecto_jacky/samplecharacter3";
 
 export interface WorkshopSkinInfo {
   id: string;
@@ -16,17 +20,17 @@ export interface WorkshopSkinInfo {
   facing: "left" | "right" | null;
 }
 
+/** `author/slug` — letters, digits, hyphens, underscores; exactly two segments. */
+const WORKSHOP_REF_RE =
+  /^[a-z0-9](?:[a-z0-9_-]*[a-z0-9])?\/[a-z0-9](?:[a-z0-9_-]*[a-z0-9])?$/i;
+
 export function isWorkshopRef(ref: string): boolean {
-  // e.g. "proyecto_jacky/samplecharacter3" — lowercase handles, no scheme, no leading slash,
-  // exactly two path segments.
-  return /^[a-z0-9](?:[a-z0-9-]*[a-z0-9])?\/[a-z0-9](?:[a-z0-9-]*[a-z0-9])?$/.test(
-    ref,
-  );
+  return WORKSHOP_REF_RE.test(ref.trim());
 }
 
 export function splitWorkshopRef(ref: string): { author: string; id: string } | null {
   if (!isWorkshopRef(ref)) return null;
-  const [author, id] = ref.split("/");
+  const [author, id] = ref.trim().toLowerCase().split("/");
   return { author: author!, id: id! };
 }
 
@@ -85,9 +89,8 @@ export async function resolveWorkshopSkin(
 /**
  * Download the .jacky zip bytes for a resolved workshop item.
  *
- * Uses `?redirect=false` (same as jacky-frontend animation-cache) to obtain a
- * short-lived GCS signed URL as JSON, then fetches the bytes. Following a 302
- * redirect cross-origin is more brittle with CORS.
+ * Uses `?redirect=false` to obtain a short-lived GCS signed URL as JSON, then
+ * fetches the bytes. Following a 302 redirect cross-origin is more brittle with CORS.
  */
 export async function downloadWorkshopZip(
   info: WorkshopSkinInfo,

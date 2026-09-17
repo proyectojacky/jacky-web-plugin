@@ -29,7 +29,7 @@ import {
   loadVisitorOverride,
   saveVisitorOverride,
 } from "../skin/skinPersistence";
-import { DEFAULT_WORKSHOP_API } from "../skin/workshopApi";
+import { DEFAULT_SITE_SKIN, DEFAULT_WORKSHOP_API } from "../skin/workshopApi";
 import { attachDrag, DragHandle, CLICK_SLOP_PX } from "./drag";
 import {
   clampToBounds,
@@ -252,7 +252,7 @@ export class JackyEngine implements JackyController {
     this.allowDropSkinFlag = options.allowDropSkin ?? true;
     this.fpsOverride = options.fps;
     this.workshopApiBase = options.workshopApiBase ?? DEFAULT_WORKSHOP_API;
-    this.configuredSkin = options.skin ?? "/sprites/Jacky";
+    this.configuredSkin = options.skin ?? DEFAULT_SITE_SKIN;
 
     this.onClickCb = options.onClick;
     this.onStateChangeCb = options.onStateChange;

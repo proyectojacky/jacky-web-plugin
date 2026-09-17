@@ -39,6 +39,7 @@ export { parseCharacterJson, parsePackageManifest, packageManifestToCharacterJso
 export type { CharacterMeta } from "./skin/characterMeta";
 export {
   DEFAULT_WORKSHOP_API,
+  DEFAULT_SITE_SKIN,
   isWorkshopRef,
   resolveWorkshopSkin,
 } from "./skin/workshopApi";
