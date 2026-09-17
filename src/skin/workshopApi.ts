@@ -17,7 +17,7 @@ export interface WorkshopSkinInfo {
 }
 
 export function isWorkshopRef(ref: string): boolean {
-  // e.g. "glumi/glumi" — lowercase handles, no scheme, no leading slash,
+  // e.g. "proyecto_jacky/samplecharacter3" — lowercase handles, no scheme, no leading slash,
   // exactly two path segments.
   return /^[a-z0-9](?:[a-z0-9-]*[a-z0-9])?\/[a-z0-9](?:[a-z0-9-]*[a-z0-9])?$/.test(
     ref,

@@ -21,7 +21,7 @@ export default function App() {
       draggable
       dialogues={["¡Hola!", "¿Qué estás programando?"]}
       chatMode="auto"
-      skin="glumi/glumi"
+      skin="proyecto_jacky/samplecharacter3"
     />
   );
 }
@@ -164,7 +164,7 @@ Let visitors try Workshop skins, or persist a personal override with `skinPersis
 
 ```tsx
 // Workshop ref (author/slug) — ephemeral preview for this tab
-await handle?.loadSkin("glumi/glumi");
+await handle?.loadSkin("proyecto_jacky/samplecharacter3");
 
 // Stable .jacky URL
 await handle?.loadSkin("https://cdn.example.com/skins/otter.jacky");
@@ -244,7 +244,7 @@ async function celebrateDownload(name: string) {
 | **Ephemeral preview (C)** | That tab only | Drop without persistence |
 
 ```tsx
-<JackyPet skin={{ workshop: "glumi/glumi", version: "latest" }} />
+<JackyPet skin={{ workshop: "proyecto_jacky/samplecharacter3", version: "latest" }} />
 <JackyPet skin="https://cdn.mysite.com/jacky/my-skin.jacky" />
 <JackyPet skin={{ folder: "/sprites/Jacky" }} />
 ```

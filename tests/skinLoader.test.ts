@@ -88,10 +88,10 @@ describe("loadSkinFromSource (zip)", () => {
 describe("workshop ref detection", () => {
   it("treats bare author/slug strings as workshop refs", async () => {
     await expect(
-      loadSkinFromSource("glumi/glumi", { sourceKind: "site" }),
+      loadSkinFromSource("proyecto_jacky/samplecharacter3", { sourceKind: "site" }),
     ).rejects.toMatchObject({
       // Network resolve fails in the test env — proves the workshop path ran.
-      message: expect.stringContaining("glumi/glumi"),
+      message: expect.stringContaining("proyecto_jacky/samplecharacter3"),
     });
   });
 });
