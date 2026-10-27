@@ -5,6 +5,11 @@
 //   Mode 3: File/Blob drop  -> preview local (never persisted as site skin)
 //   Mode 4: workshop ref    -> "author/slug" via workshop API (canonical way
 //                              to share skins with every visitor)
+//   Mode 5: built-in pet    -> "jacky" | "bunny" | "bear" | "duckie" |
+//                              "panda" | "random" (folders on jacky.club)
+//
+// Folder and zip packs may also be StreamAvatars spritesheets (one PNG +
+// data.txt, see ./spritesheet).
 //
 // Always extracts to memory (blob: URLs / HTMLImageElement); the stable URL
 // or workshop ref is what persists.
@@ -17,6 +22,12 @@ import {
   parseCharacterJson,
   parsePackageManifest,
 } from "./characterMeta";
+import { builtinSkinFolder, isBuiltinSkin, isRandomSkin } from "./builtinSkins";
+import {
+  buildSpritesheetStateMap,
+  parseStreamAvatarsData,
+  sliceSpritesheet,
+} from "./spritesheet";
 import {
   cacheGetZip,
   cachePutZip,
@@ -34,7 +45,7 @@ import {
 } from "./workshopApi";
 
 export type SkinSourceConfig =
-  | string // folder path | .jacky URL | workshop ref "author/slug"
+  | string // built-in pet name | folder path | .jacky URL | workshop ref "author/slug"
   | { workshop: `${string}/${string}`; version?: "latest" | string }
   | { url: string; sha256?: string }
   | { folder: string }
@@ -57,10 +68,13 @@ export interface SkinMetadata {
   totalFrames: number;
 }
 
+/** Folder/zip frames are images; spritesheet frames are pre-cut canvases. */
+export type SkinFrame = HTMLImageElement | HTMLCanvasElement;
+
 export interface LoadedSkin {
   meta: SkinMetadata;
   /** animName -> loaded frames (ordered). Mutated as background anims arrive. */
-  frames: Map<string, HTMLImageElement[]>;
+  frames: Map<string, SkinFrame[]>;
   /** animName -> sprite subdirectory inside the pack. */
   stateMap: Record<string, string>;
   /** Object URLs created for this skin (revoke on swap/destroy). */
@@ -79,6 +93,8 @@ export interface LoadSkinOptions {
   sourceKind: SkinSourceKind;
   /** Workshop API base for author/slug refs. */
   workshopApiBase?: string;
+  /** Base URL of the built-in pet folders (default https://jacky.club/sprites). */
+  builtinSkinBase?: string;
   /** Abort in-flight fetches/decodes (React remount, destroy, skin swap). */
   signal?: AbortSignal;
   /**
@@ -96,7 +112,10 @@ type NormalizedSource =
   | { kind: "workshop"; ref: string; version: string }
   | { kind: "zip-blob"; blob: Blob; name: string };
 
-function normalizeSource(source: SkinSourceConfig): NormalizedSource {
+function normalizeSource(
+  source: SkinSourceConfig,
+  builtinSkinBase?: string,
+): NormalizedSource {
   if (typeof Blob !== "undefined" && source instanceof Blob) {
     const name =
       typeof File !== "undefined" && source instanceof File
@@ -107,6 +126,9 @@ function normalizeSource(source: SkinSourceConfig): NormalizedSource {
 
   if (typeof source === "string") {
     const trimmed = source.trim();
+    if (isBuiltinSkin(trimmed) || isRandomSkin(trimmed)) {
+      return { kind: "folder", base: builtinSkinFolder(trimmed, builtinSkinBase)! };
+    }
     if (isWorkshopRef(trimmed)) {
       const parts = splitWorkshopRef(trimmed)!;
       return {
@@ -338,6 +360,31 @@ async function loadFolderSkin(
   }
   const character = parseCharacterJson(metaRaw, "Jacky");
 
+  if (character.spritesheet) {
+    const { image, dataFile } = character.spritesheet;
+    if (!image) {
+      throw new SkinLoadError(
+        `Folder skin "${base}" needs "spritesheet" in character.json ` +
+          `(browsers cannot list directories)`,
+        "no_frames",
+      );
+    }
+    let dataRaw: unknown;
+    try {
+      throwIfAborted(signal);
+      const res = await fetch(join(dataFile), { signal });
+      if (!res.ok) throw new Error(`HTTP ${res.status}`);
+      dataRaw = await res.json();
+    } catch (err) {
+      throwIfAborted(signal);
+      throw new SkinLoadError(
+        `Folder skin "${base}" could not read ${dataFile} (${String(err)})`,
+        "no_frames",
+      );
+    }
+    return buildSpritesheetSkin(join(image), dataRaw, character, options);
+  }
+
   let manifest: FolderManifest;
   try {
     throwIfAborted(signal);
@@ -393,7 +440,7 @@ async function loadFolderSkin(
   const stateMap = character.stateMap ?? buildStateMap(dirNames);
   const { boot, rest } = splitBootAndRest(stateMap);
 
-  const frames = new Map<string, HTMLImageElement[]>();
+  const frames = new Map<string, SkinFrame[]>();
 
   const filesFor = (dirName: string): string[] => {
     const filesRaw = animationsRaw[dirName];
@@ -509,6 +556,47 @@ async function loadZipSkin(
     );
   }
 
+  if (character.spritesheet) {
+    const relName = (name: string) =>
+      name.startsWith(rootPrefix) ? name.slice(rootPrefix.length) : name;
+    const { image, dataFile } = character.spritesheet;
+    const dataEntry = zip.file(`${rootPrefix}${dataFile}`);
+    // Same lookup as the desktop: named sheet, then "*spritesheet*.png",
+    // then any root PNG that isn't the preview.
+    const rootPngs = entries
+      .filter((e) => {
+        const rel = relName(e.name);
+        return !rel.includes("/") && rel.toLowerCase().endsWith(".png");
+      })
+      .sort((a, b) => (a.name < b.name ? -1 : 1));
+    const sheetEntry =
+      (image ? zip.file(`${rootPrefix}${image}`) : null) ??
+      rootPngs.find((e) => relName(e.name).toLowerCase().includes("spritesheet")) ??
+      rootPngs.find((e) => relName(e.name).toLowerCase() !== "preview.png");
+    if (!dataEntry || !sheetEntry) {
+      throw new SkinLoadError(
+        `Spritesheet pack "${character.name}" needs ${dataFile} and a sheet PNG`,
+        "no_frames",
+      );
+    }
+    let dataRaw: unknown;
+    try {
+      dataRaw = JSON.parse(await dataEntry.async("string"));
+    } catch (err) {
+      throw new SkinLoadError(
+        `${dataFile} is not valid JSON: ${String(err)}`,
+        "no_frames",
+      );
+    }
+    const sheetUrl = URL.createObjectURL(await sheetEntry.async("blob"));
+    try {
+      return await buildSpritesheetSkin(sheetUrl, dataRaw, character, options);
+    } finally {
+      // Frames are canvases; the sheet URL isn't needed after slicing.
+      URL.revokeObjectURL(sheetUrl);
+    }
+  }
+
   // Group PNGs by their sprite subdirectory (relative to the pack root).
   const dirFiles = new Map<string, string[]>();
   for (const entry of entries) {
@@ -527,7 +615,7 @@ async function loadZipSkin(
   const stateMap = character.stateMap ?? buildStateMap(dirFiles.keys());
   const { boot, rest } = splitBootAndRest(stateMap);
 
-  const frames = new Map<string, HTMLImageElement[]>();
+  const frames = new Map<string, SkinFrame[]>();
   const objectUrls: string[] = [];
 
   const loadAnim = async (
@@ -595,10 +683,44 @@ async function loadZipSkin(
   );
 }
 
+// ── Spritesheet mode (StreamAvatars sheet + data.txt) ───────────────────────
+
+async function buildSpritesheetSkin(
+  sheetUrl: string,
+  dataRaw: unknown,
+  character: CharacterMeta,
+  options: LoadSkinOptions,
+): Promise<LoadedSkin> {
+  const info = parseStreamAvatarsData(dataRaw);
+  if (!info) {
+    throw new SkinLoadError(
+      `Skin "${character.name}" has no animations in its StreamAvatars data`,
+      "no_frames",
+    );
+  }
+  const [sheet] = await loadUrlFrames([sheetUrl], options.signal);
+  throwIfAborted(options.signal);
+  if (!sheet) {
+    throw new SkinLoadError(
+      `Could not load the spritesheet of "${character.name}"`,
+      "network",
+    );
+  }
+
+  const sliced = sliceSpritesheet(sheet, info);
+  const stateMap = buildSpritesheetStateMap(sliced.keys(), character.stateMap);
+  const frames = new Map<string, SkinFrame[]>();
+  for (const [animName, sheetAnim] of Object.entries(stateMap)) {
+    const list = sliced.get(sheetAnim);
+    if (list) frames.set(animName, list);
+  }
+  return finalizeSkin(frames, stateMap, character, options.sourceKind);
+}
+
 // ── Validation + metadata ────────────────────────────────────────────────────
 
 function finalizeSkin(
-  frames: Map<string, HTMLImageElement[]>,
+  frames: Map<string, SkinFrame[]>,
   stateMap: Record<string, string>,
   character: CharacterMeta,
   sourceKind: SkinSourceKind,
@@ -659,7 +781,7 @@ export async function loadSkinFromSource(
   options: LoadSkinOptions,
 ): Promise<LoadedSkin> {
   const apiBase = options.workshopApiBase ?? DEFAULT_WORKSHOP_API;
-  const normalized = normalizeSource(source);
+  const normalized = normalizeSource(source, options.builtinSkinBase);
 
   switch (normalized.kind) {
     case "folder":

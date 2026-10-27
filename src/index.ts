@@ -34,6 +34,7 @@ export type {
   LoadedSkin,
   SkinSourceKind,
   LoadSkinOptions,
+  SkinFrame,
 } from "./skin/skinLoader";
 export { parseCharacterJson, parsePackageManifest, packageManifestToCharacterJson } from "./skin/characterMeta";
 export type { CharacterMeta } from "./skin/characterMeta";
@@ -44,6 +45,18 @@ export {
   resolveWorkshopSkin,
 } from "./skin/workshopApi";
 export type { WorkshopSkinInfo } from "./skin/workshopApi";
+export {
+  BUILTIN_SKINS,
+  DEFAULT_BUILTIN_SKIN_BASE,
+  isBuiltinSkin,
+  pickRandomBuiltinSkin,
+} from "./skin/builtinSkins";
+export type { BuiltinSkinName } from "./skin/builtinSkins";
+export {
+  parseStreamAvatarsData,
+  buildSpritesheetStateMap,
+} from "./skin/spritesheet";
+export type { SpritesheetInfo, SpritesheetRow } from "./skin/spritesheet";
 export { initJacky } from "./initJacky";
 export type {
   WalkMode,

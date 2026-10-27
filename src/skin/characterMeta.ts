@@ -8,6 +8,8 @@ export interface CharacterMeta {
   spriteFacing: "left" | "right";
   /** Explicit state_map override from character.json (wins over auto-detect). */
   stateMap?: Record<string, string>;
+  /** Set for StreamAvatars-style packs: one sheet PNG + data.txt. */
+  spritesheet?: { image?: string; dataFile: string };
 }
 
 export class SkinLoadError extends Error {
@@ -81,7 +83,20 @@ export function parseCharacterJson(
       ? raw.name.trim()
       : fallbackName;
 
-  return { name, spriteSize, fps, spriteFacing, stateMap };
+  const meta: CharacterMeta = { name, spriteSize, fps, spriteFacing, stateMap };
+  if (raw.type === "streamavatars" || raw.type === "spritesheet") {
+    meta.spritesheet = {
+      image:
+        typeof raw.spritesheet === "string" && raw.spritesheet.trim()
+          ? raw.spritesheet.trim()
+          : undefined,
+      dataFile:
+        typeof raw.data_file === "string" && raw.data_file.trim()
+          ? raw.data_file.trim()
+          : "data.txt",
+    };
+  }
+  return meta;
 }
 
 /**
@@ -131,6 +146,8 @@ export function packageManifestToCharacterJson(
   if (typeof skin.type === "string" && skin.type.trim()) {
     character.type = skin.type.trim();
   }
+  if (typeof skin.spritesheet === "string") character.spritesheet = skin.spritesheet;
+  if (typeof skin.data_file === "string") character.data_file = skin.data_file;
   const stateMap = parseStateMap(skin.state_map);
   if (stateMap) character.state_map = stateMap;
   if (isRecord(skin.card)) character.card = skin.card;

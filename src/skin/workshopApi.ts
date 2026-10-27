@@ -4,10 +4,11 @@
 export const DEFAULT_WORKSHOP_API = "https://api.jacky.club";
 
 /**
- * Default site skin for embeds that omit `skin`.
- * Workshop ref so third-party sites work without hosting sprite folders.
+ * Default site skin for embeds that omit `skin`: a random built-in pet
+ * (see ./builtinSkins), so third-party sites work without hosting sprite
+ * folders or depending on Workshop content.
  */
-export const DEFAULT_SITE_SKIN = "proyecto_jacky/samplecharacter3";
+export const DEFAULT_SITE_SKIN = "random";
 
 export interface WorkshopSkinInfo {
   id: string;

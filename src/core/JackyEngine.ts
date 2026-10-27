@@ -30,6 +30,12 @@ import {
   saveVisitorOverride,
 } from "../skin/skinPersistence";
 import { DEFAULT_SITE_SKIN, DEFAULT_WORKSHOP_API } from "../skin/workshopApi";
+import {
+  BuiltinSkinName,
+  DEFAULT_BUILTIN_SKIN_BASE,
+  isRandomSkin,
+  pickRandomBuiltinSkin,
+} from "../skin/builtinSkins";
 import { attachDrag, DragHandle, CLICK_SLOP_PX } from "./drag";
 import {
   clampToBounds,
@@ -89,7 +95,10 @@ export interface JackyOptions {
   chatMode?: ChatMode;
   chatInterval?: [number, number];
   bubbleDuration?: number;
-  /** Skin: folder path, .jacky URL, workshop ref, or File/Blob. */
+  /**
+   * Skin: built-in pet ("jacky" | "bunny" | "bear" | "duckie" | "panda" |
+   * "random", the default), folder path, .jacky URL, workshop ref, or File/Blob.
+   */
   skin?: SkinSourceConfig;
   allowDropSkin?: boolean;
   skinPersistence?: "none" | "visitor";
@@ -97,6 +106,8 @@ export interface JackyOptions {
   /** Overrides skin FPS when provided. */
   fps?: number;
   workshopApiBase?: string;
+  /** Where built-in pet folders are hosted (default https://jacky.club/sprites). */
+  builtinSkinBase?: string;
   onClick?: (pet: JackyController, event: MouseEvent) => void;
   onStateChange?: (newState: PetState, oldState: PetState) => void;
   onSkinLoaded?: (skinInfo: SkinMetadata) => void;
@@ -175,7 +186,10 @@ export class JackyEngine implements JackyController {
   private skin: LoadedSkin | null = null;
   private available: ReadonlySet<string> = new Set(["idle"]);
   private workshopApiBase: string;
+  private builtinSkinBase: string;
   private configuredSkin: SkinSourceConfig;
+  /** Fixed per engine so resetSkin / re-renders keep the same random pet. */
+  private readonly randomPick: BuiltinSkinName = pickRandomBuiltinSkin();
 
   // State machine
   private petState: PetState = PetState.IDLE;
@@ -252,6 +266,7 @@ export class JackyEngine implements JackyController {
     this.allowDropSkinFlag = options.allowDropSkin ?? true;
     this.fpsOverride = options.fps;
     this.workshopApiBase = options.workshopApiBase ?? DEFAULT_WORKSHOP_API;
+    this.builtinSkinBase = options.builtinSkinBase ?? DEFAULT_BUILTIN_SKIN_BASE;
     this.configuredSkin = options.skin ?? DEFAULT_SITE_SKIN;
 
     this.onClickCb = options.onClick;
@@ -310,7 +325,7 @@ export class JackyEngine implements JackyController {
 
     if (!this.skin) {
       try {
-        await this.loadSkin(this.configuredSkin);
+        await this.loadSkin(this.siteSkin());
       } catch (err) {
         this.reportError(err);
       }
@@ -758,6 +773,7 @@ export class JackyEngine implements JackyController {
       return await loadSkinFromSource(source as SkinSourceConfig, {
         sourceKind: options.sourceKind,
         workshopApiBase: this.workshopApiBase,
+        builtinSkinBase: this.builtinSkinBase,
         signal: controller.signal,
         onFramesUpdated: this.onSkinFramesUpdated,
       });
@@ -951,8 +967,14 @@ export class JackyEngine implements JackyController {
   async resetSkin(): Promise<void> {
     await clearVisitorOverride(this.skinScope);
     if (!this.destroyed) {
-      await this.loadSkin(this.configuredSkin);
+      await this.loadSkin(this.siteSkin());
     }
+  }
+
+  /** Configured skin with "random" pinned to this engine's pick. */
+  private siteSkin(): SkinSourceConfig {
+    const skin = this.configuredSkin;
+    return typeof skin === "string" && isRandomSkin(skin) ? this.randomPick : skin;
   }
 
   getSkinInfo(): SkinMetadata | null {
@@ -1048,9 +1070,12 @@ export class JackyEngine implements JackyController {
       this.positionSprite();
     }
     if (patch.fps !== undefined) this.fpsOverride = patch.fps;
+    if (patch.builtinSkinBase !== undefined) {
+      this.builtinSkinBase = patch.builtinSkinBase;
+    }
     if (patch.skin !== undefined && patch.skin !== this.configuredSkin) {
       this.configuredSkin = patch.skin;
-      void this.loadSkin(patch.skin).catch((err) => this.reportError(err));
+      void this.loadSkin(this.siteSkin()).catch((err) => this.reportError(err));
     }
     if (patch.allowDropSkin !== undefined) {
       this.allowDropSkinFlag = patch.allowDropSkin;

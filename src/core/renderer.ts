@@ -1,7 +1,7 @@
 // Canvas renderer: draws the current animation frame with pixel-art
 // nearest-neighbour scaling and horizontal mirroring for facing.
 
-import type { LoadedSkin } from "../skin/skinLoader";
+import type { LoadedSkin, SkinFrame } from "../skin/skinLoader";
 
 export interface DrawArgs {
   /** Resolved animation name (after fallbacks). */
@@ -39,7 +39,7 @@ export class Renderer {
   }
 
   /** Highest-resolution available frame for the current animation. */
-  private currentFrame(animName: string, frameIndex: number): HTMLImageElement | null {
+  private currentFrame(animName: string, frameIndex: number): SkinFrame | null {
     const skin = this.skin;
     if (!skin) return null;
     const frames = skin.frames.get(animName);
@@ -58,8 +58,9 @@ export class Renderer {
     if (!frame) return;
 
     // Aspect-fit inside the canvas square.
-    const natural = frame.naturalWidth || w;
-    const naturalH = frame.naturalHeight || h;
+    const isImage = frame instanceof HTMLImageElement;
+    const natural = (isImage ? frame.naturalWidth : frame.width) || w;
+    const naturalH = (isImage ? frame.naturalHeight : frame.height) || h;
     const scale = Math.min(w / natural, h / naturalH);
     const dw = natural * scale;
     const dh = naturalH * scale;

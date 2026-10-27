@@ -38,6 +38,7 @@ export interface JackyPetProps {
   skinScope?: string;
   fps?: number;
   workshopApiBase?: string;
+  builtinSkinBase?: string;
   onClick?: (pet: JackyController, event: MouseEvent) => void;
   onStateChange?: (newState: PetState, oldState: PetState) => void;
   onSkinLoaded?: (skinInfo: SkinMetadata) => void;
@@ -66,6 +67,7 @@ function toEngineOptions(props: JackyPetProps): JackyOptions {
     skinScope: props.skinScope,
     fps: props.fps,
     workshopApiBase: props.workshopApiBase,
+    builtinSkinBase: props.builtinSkinBase,
     onClick: props.onClick,
     onStateChange: props.onStateChange,
     onSkinLoaded: props.onSkinLoaded,

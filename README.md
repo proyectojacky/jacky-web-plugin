@@ -21,7 +21,7 @@ export default function App() {
       draggable
       dialogues={["¡Hola!", "¿Qué estás programando?"]}
       chatMode="auto"
-      skin="proyecto_jacky/samplecharacter3"
+      skin="bunny"
     />
   );
 }
@@ -33,7 +33,7 @@ export default function App() {
 import { JackyPet, useJackyPet } from "@proyectojacky/jacky/react";
 
 function App() {
-  const { ref, handle } = useJackyPet({ skin: "/sprites/Jacky" });
+  const { ref, handle } = useJackyPet({ skin: "jacky" });
   return (
     <>
       <button onClick={() => handle?.say("¡Formulario enviado!")}>
@@ -83,7 +83,8 @@ document.getElementById("submit")?.addEventListener("click", () => {
 | `chatMode` | `'auto' \| 'click_only' \| 'disabled'` | `'auto'` | When Jacky speaks. |
 | `chatInterval` | `[minMs, maxMs]` | `[5000, 15000]` | Auto-chat range. |
 | `bubbleDuration` | `number` | `4000` | Speech bubble duration (ms). |
-| `skin` | `string \| SkinSourceConfig \| File \| Blob` | `/sprites/Jacky` | Skin source. |
+| `skin` | `string \| SkinSourceConfig \| File \| Blob` | `'random'` | Built-in pet (`'jacky'`, `'bunny'`, `'bear'`, `'duckie'`, `'panda'`, `'random'`), Workshop ref, `.jacky` URL, folder, File/Blob. |
+| `builtinSkinBase` | `string` | `'https://jacky.club/sprites'` | Where the built-in pets are hosted (self-host them by copying the folders). |
 | `allowDropSkin` | `boolean` | `true` | Drop `.jacky` files onto Jacky. |
 | `skinPersistence` | `'none' \| 'visitor'` | `'none'` | Persist visitor overrides (IndexedDB). |
 | `skinScope` | `string` | `'default'` | Namespace for visitor overrides. |
@@ -163,8 +164,11 @@ handle?.setWalkMode("random");        // wander again
 Let visitors try Workshop skins, or persist a personal override with `skinPersistence="visitor"`.
 
 ```tsx
+// Built-in pet: "jacky" | "bunny" | "bear" | "duckie" | "panda" | "random"
+await handle?.loadSkin("panda");
+
 // Workshop ref (author/slug) — ephemeral preview for this tab
-await handle?.loadSkin("proyecto_jacky/samplecharacter3");
+await handle?.loadSkin("author/slug");
 
 // Stable .jacky URL
 await handle?.loadSkin("https://cdn.example.com/skins/otter.jacky");
@@ -239,15 +243,21 @@ async function celebrateDownload(name: string) {
 
 | Layer | Who sees it | How it is installed |
 | :--- | :--- | :--- |
-| **Site skin (A)** | Every visitor | `skin="author/slug"` or a stable URL in your code |
+| **Site skin (A)** | Every visitor | `skin="bunny"` (built-in), `skin="author/slug"` or a stable URL in your code |
 | **Visitor override (B)** | That browser only | Drop / `loadSkin` with `skinPersistence="visitor"` |
 | **Ephemeral preview (C)** | That tab only | Drop without persistence |
 
 ```tsx
-<JackyPet skin={{ workshop: "proyecto_jacky/samplecharacter3", version: "latest" }} />
+<JackyPet />                      {/* random built-in pet on each page load */}
+<JackyPet skin="duckie" />        {/* jacky | bunny | bear | duckie | panda | random */}
+<JackyPet skin={{ workshop: "author/slug", version: "latest" }} />
 <JackyPet skin="https://cdn.mysite.com/jacky/my-skin.jacky" />
 <JackyPet skin={{ folder: "/sprites/Jacky" }} />
 ```
+
+**Built-in pets** (`jacky`, `bunny`, `bear`, `duckie`, `panda`) load from `https://jacky.club/sprites/<Name>`; `random` (the default) picks one per page load. Pass `builtinSkinBase` to serve the same folders from your own host.
+
+**StreamAvatars spritesheets** work as folders or inside `.jacky` packs: a `character.json` with `"type": "streamavatars"`, `"spritesheet": "sheet.png"` and `"data_file": "data.txt"` next to those files.
 
 **`.jacky` packages** are zip archives. A package `manifest.json` is converted to skin metadata at load time; a ready `character.json` inside the zip also works.
 
